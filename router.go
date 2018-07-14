@@ -14,29 +14,34 @@ const (
 	post   = http.MethodPost
 	get    = http.MethodGet
 	put    = http.MethodPut
+	patch  = http.MethodPatch
 	delete = http.MethodDelete
 )
 
-// HandlerRequest ...
-type HandlerRequest struct {
+// APIGRequest is used as the input of handler functions.
+// The Claims, Path, and QryStr will be populated by the the APIGatewayProxyRequest.
+// The Request itself is also passed through if you need further access.
+type APIGRequest struct {
 	Claims  map[string]interface{}
 	Path    map[string]string
 	QryStr  map[string]string
 	Request *events.APIGatewayProxyRequest
 }
 
-// HandlerResponse ...
-type HandlerResponse struct {
+// APIGResponse is used as the output of handler functions.
+// Populate Status and Body with your http response or populate Err with your error.
+type APIGResponse struct {
 	Status int
 	Body   []byte
 	Err    error
 }
 
-// Handler ...
-type Handler func(req *HandlerRequest, res *HandlerResponse)
+// APIGHandler is the interface a handler function must implement to be used
+// with Get, Post, Put, Patch, and Delete.
+type APIGHandler func(req *APIGRequest, res *APIGResponse)
 
-// Router ...
-type Router struct {
+// APIGRouter is the object that handlers build upon and is used in the end to respond.
+type APIGRouter struct {
 	request   *events.APIGatewayProxyRequest
 	endpoints map[string]*radix.Tree
 	params    map[string]string
@@ -45,14 +50,15 @@ type Router struct {
 
 // NOTE: Begin router methods.
 
-// New ...
-func New(r *events.APIGatewayProxyRequest, svcprefix string) *Router {
-	return &Router{
+// NewAPIGRouter creates a new router using the request and a prefix to strip from your incoming requests.
+func NewAPIGRouter(r *events.APIGatewayProxyRequest, svcprefix string) *APIGRouter {
+	return &APIGRouter{
 		request: r,
 		endpoints: map[string]*radix.Tree{
 			post:   radix.New(),
 			get:    radix.New(),
 			put:    radix.New(),
+			patch:  radix.New(),
 			delete: radix.New(),
 		},
 		params:    map[string]string{},
@@ -60,28 +66,33 @@ func New(r *events.APIGatewayProxyRequest, svcprefix string) *Router {
 	}
 }
 
-// Get ...
-func (r *Router) Get(route string, handler Handler) {
+// Get creates a new get endpoint.
+func (r *APIGRouter) Get(route string, handler APIGHandler) {
 	r.addEndpoint(get, route, handler)
 }
 
-// Post ...
-func (r *Router) Post(route string, handler Handler) {
+// Post creates a new post endpoint.
+func (r *APIGRouter) Post(route string, handler APIGHandler) {
 	r.addEndpoint(post, route, handler)
 }
 
-// Put ...
-func (r *Router) Put(route string, handler Handler) {
+// Put creates a new put endpoint.
+func (r *APIGRouter) Put(route string, handler APIGHandler) {
 	r.addEndpoint(put, route, handler)
 }
 
-// Delete ...
-func (r *Router) Delete(route string, handler Handler) {
+// Patch creates a new patch endpoint
+func (r *APIGRouter) Patch(route string, handler APIGHandler) {
+	r.addEndpoint(patch, route, handler)
+}
+
+// Delete creates a new delete endpoint.
+func (r *APIGRouter) Delete(route string, handler APIGHandler) {
 	r.addEndpoint(delete, route, handler)
 }
 
-// Respond ...
-func (r *Router) Respond() events.APIGatewayProxyResponse {
+// Respond returns an APIGatewayProxyResponse to respond to the lambda request.
+func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 	var (
 		handlerInterface interface{}
 		ok               bool
@@ -109,15 +120,17 @@ func (r *Router) Respond() events.APIGatewayProxyResponse {
 		return response
 	}
 
-	handler := handlerInterface.(Handler)
+	handler := handlerInterface.(APIGHandler)
 
-	req := &HandlerRequest{
-		Claims:  r.request.RequestContext.Authorizer["claims"].(map[string]interface{}),
+	req := &APIGRequest{
 		Path:    r.request.PathParameters,
 		QryStr:  r.request.QueryStringParameters,
 		Request: r.request,
 	}
-	res := &HandlerResponse{}
+	if r.request.RequestContext.Authorizer["claims"] != nil {
+		req.Claims = r.request.RequestContext.Authorizer["claims"].(map[string]interface{})
+	}
+	res := &APIGResponse{}
 
 	handler(req, res)
 	status, respbody, err := res.deconstruct()
@@ -147,11 +160,11 @@ func stripSlashesAndSplit(s string) []string {
 	return strings.Split(s, "/")
 }
 
-func (res *HandlerResponse) deconstruct() (int, []byte, error) {
+func (res *APIGResponse) deconstruct() (int, []byte, error) {
 	return res.Status, res.Body, res.Err
 }
 
-func (r *Router) addEndpoint(method string, route string, handler Handler) {
+func (r *APIGRouter) addEndpoint(method string, route string, handler APIGHandler) {
 	if _, overwrite := r.endpoints[method].Insert(route, handler); overwrite {
 		panic("endpoint already existent")
 	}
@@ -163,5 +176,5 @@ func (r *Router) addEndpoint(method string, route string, handler Handler) {
 		}
 	}
 
-	log.Printf("router: %+v", *r)
+	log.Printf("endpoint: %+v %+v", method, route)
 }
