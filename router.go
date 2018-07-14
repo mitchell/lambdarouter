@@ -10,17 +10,16 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-// Method constants.
 const (
-	POST   = http.MethodPost
-	GET    = http.MethodGet
-	PUT    = http.MethodPut
-	DELETE = http.MethodDelete
+	post   = http.MethodPost
+	get    = http.MethodGet
+	put    = http.MethodPut
+	delete = http.MethodDelete
 )
 
 // HandlerRequest ...
 type HandlerRequest struct {
-	Claims  map[string]string
+	Claims  map[string]interface{}
 	Path    map[string]string
 	QryStr  map[string]string
 	Request *events.APIGatewayProxyRequest
@@ -51,10 +50,10 @@ func New(r *events.APIGatewayProxyRequest, svcprefix string) *Router {
 	return &Router{
 		request: r,
 		endpoints: map[string]*radix.Tree{
-			POST:   radix.New(),
-			GET:    radix.New(),
-			PUT:    radix.New(),
-			DELETE: radix.New(),
+			post:   radix.New(),
+			get:    radix.New(),
+			put:    radix.New(),
+			delete: radix.New(),
 		},
 		params:    map[string]string{},
 		svcprefix: svcprefix,
@@ -63,22 +62,22 @@ func New(r *events.APIGatewayProxyRequest, svcprefix string) *Router {
 
 // Get ...
 func (r *Router) Get(route string, handler Handler) {
-	r.addEndpoint(GET, route, handler)
+	r.addEndpoint(get, route, handler)
 }
 
 // Post ...
 func (r *Router) Post(route string, handler Handler) {
-	r.addEndpoint(POST, route, handler)
+	r.addEndpoint(post, route, handler)
 }
 
 // Put ...
 func (r *Router) Put(route string, handler Handler) {
-	r.addEndpoint(PUT, route, handler)
+	r.addEndpoint(put, route, handler)
 }
 
 // Delete ...
 func (r *Router) Delete(route string, handler Handler) {
-	r.addEndpoint(DELETE, route, handler)
+	r.addEndpoint(delete, route, handler)
 }
 
 // Respond ...
@@ -113,7 +112,7 @@ func (r *Router) Respond() events.APIGatewayProxyResponse {
 	handler := handlerInterface.(Handler)
 
 	req := &HandlerRequest{
-		Claims:  r.request.RequestContext.Authorizer["claims"].(map[string]string),
+		Claims:  r.request.RequestContext.Authorizer["claims"].(map[string]interface{}),
 		Path:    r.request.PathParameters,
 		QryStr:  r.request.QueryStringParameters,
 		Request: r.request,
