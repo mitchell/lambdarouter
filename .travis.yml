@@ -5,6 +5,7 @@ go:
   - "1.10.x"
   - master
 install:
+  - "curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh"
   - "dep ensure"
 build:
   - "go test -v ./..."
