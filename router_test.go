@@ -54,7 +54,7 @@ func TestRouterSpec(t *testing.T) {
 					request.HTTPMethod = http.MethodGet
 					request.Path = "/orders/filter"
 
-					Convey("The router will return and error body and a not found status", func() {
+					Convey("The router will return an error body and a status not found", func() {
 						response := rtr.Respond()
 
 						So(response.StatusCode, ShouldEqual, http.StatusNotFound)
@@ -66,6 +66,34 @@ func TestRouterSpec(t *testing.T) {
 					So(func() {
 						rtr.Get("/orders/filter/by_user/{id}", hdlrfunc)
 					}, ShouldPanicWith, "endpoint already existent")
+				})
+
+				Convey("And a Get handler expecting the pattern /orders/filter", func() {
+					rtr.Get("/orders/filter", hdlrfunc)
+
+					Convey("And the request matches the pattern and the path params are filled", func() {
+						request.HTTPMethod = http.MethodGet
+						request.Path = "/shipping/orders/filter"
+
+						Convey("The router will return the expected status and body", func() {
+							response := rtr.Respond()
+
+							So(response.StatusCode, ShouldEqual, http.StatusOK)
+							So(response.Body, ShouldEqual, "hello")
+						})
+					})
+
+					Convey("And the request does NOT match either of the patterns", func() {
+						request.HTTPMethod = http.MethodGet
+						request.Path = "/shipping/orders/filter/by_user"
+
+						Convey("The router will return an error body and a status not found", func() {
+							response := rtr.Respond()
+
+							So(response.StatusCode, ShouldEqual, http.StatusNotFound)
+							So(response.Body, ShouldEqual, "{\"error\":\"no route matching path found\"}")
+						})
+					})
 				})
 			})
 
