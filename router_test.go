@@ -2,7 +2,6 @@ package lambdarouter
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"testing"
 
@@ -18,7 +17,6 @@ func TestRouterSpec(t *testing.T) {
 
 		Convey("When the handler func does NOT return an error", func() {
 			hdlrfunc := func(req *APIGRequest, res *APIGResponse) {
-				log.Printf("claims: %+v", req.Claims)
 				res.Status = http.StatusOK
 				res.Body = []byte("hello")
 				res.Err = nil

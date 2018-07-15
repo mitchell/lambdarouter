@@ -2,7 +2,6 @@ package lambdarouter
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
@@ -101,7 +100,6 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 		path         = strings.TrimPrefix(r.request.Path, "/"+r.svcprefix)
 		response     = events.APIGatewayProxyResponse{}
 	)
-	log.Printf("path: %+v", path)
 
 	for k := range r.params {
 		p := strings.TrimPrefix(k, "{")
@@ -110,7 +108,6 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 			path = strings.Replace(path, r.request.PathParameters[p], k, -1)
 		}
 	}
-	log.Printf("path: %+v", path)
 
 	if handlerInterface, ok = endpointTree.Get(path); !ok {
 		respbody, _ := json.Marshal(map[string]string{"error": "no route matching path found"})
@@ -176,5 +173,4 @@ func (r *APIGRouter) addEndpoint(method string, route string, handler APIGHandle
 		}
 	}
 
-	log.Printf("endpoint: %+v %+v", method, route)
 }
