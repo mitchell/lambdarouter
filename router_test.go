@@ -20,7 +20,6 @@ func TestRouterSpec(t *testing.T) {
 				res.Status = http.StatusOK
 				res.Body = []byte("hello")
 				res.Err = nil
-
 			}
 
 			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {
@@ -128,15 +127,24 @@ func TestRouterSpec(t *testing.T) {
 		})
 
 		Convey("When the handler func does return a status < 400", func() {
-			hdlrfunc := func(req *APIGRequest, res *APIGResponse) {
+			middlefunc1 := func(req *APIGRequest, res *APIGResponse) {
+				res.Status = http.StatusOK
+				res.Body = []byte("hello")
+				res.Err = nil
+			}
+			middlefunc2 := func(req *APIGRequest, res *APIGResponse) {
 				res.Status = http.StatusOK
 				res.Body = []byte("hello")
 				res.Err = errors.New("bad request")
-
+			}
+			hdlrfunc := func(req *APIGRequest, res *APIGResponse) {
+				res.Status = http.StatusOK
+				res.Body = []byte("hello")
+				res.Err = nil
 			}
 
 			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {
-				rtr.Get("/orders/filter/by_user/{id}", hdlrfunc)
+				rtr.Get("/orders/filter/by_user/{id}", middlefunc1, middlefunc2, hdlrfunc)
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet
