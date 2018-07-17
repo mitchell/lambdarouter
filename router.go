@@ -21,6 +21,7 @@ const (
 // The Claims, Path, and QryStr will be populated by the the APIGatewayProxyRequest.
 // The Request itself is also passed through if you need further access.
 type APIGRequest struct {
+	Body    string
 	Claims  map[string]interface{}
 	Path    map[string]string
 	QryStr  map[string]string
@@ -124,6 +125,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 
 	for _, handler := range handlers {
 		req := &APIGRequest{
+			Body:    r.request.Body,
 			Path:    r.request.PathParameters,
 			QryStr:  r.request.QueryStringParameters,
 			Request: r.request,
