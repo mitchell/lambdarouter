@@ -16,18 +16,18 @@ func TestRouterSpec(t *testing.T) {
 		rtr := NewAPIGRouter(&request, "shipping")
 
 		Convey("When the handler func does NOT return an error", func() {
-			hdlrfunc := func(req *APIGRequest, res *APIGResponse) {
-				res.Status = http.StatusOK
-				res.Body = []byte("hello")
-				res.Err = nil
+			hdlrfunc := func(ctx *APIGContext) {
+				ctx.Status = http.StatusOK
+				ctx.Body = []byte("hello")
+				ctx.Err = nil
 			}
 
 			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {
 				rtr.Get("/orders/filter/by_user/{id}", hdlrfunc)
-				rtr.Post("/orders", func(req *APIGRequest, res *APIGResponse) {})
-				rtr.Put("/orders", func(req *APIGRequest, res *APIGResponse) {})
-				rtr.Patch("/orders", func(req *APIGRequest, res *APIGResponse) {})
-				rtr.Delete("/orders/{id}", func(req *APIGRequest, res *APIGResponse) {})
+				rtr.Post("/orders", func(ctx *APIGContext) {})
+				rtr.Put("/orders", func(ctx *APIGContext) {})
+				rtr.Patch("/orders", func(ctx *APIGContext) {})
+				rtr.Delete("/orders/{id}", func(ctx *APIGContext) {})
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet
@@ -99,10 +99,10 @@ func TestRouterSpec(t *testing.T) {
 		})
 
 		Convey("When the handler func does return a record not found", func() {
-			hdlrfunc := func(req *APIGRequest, res *APIGResponse) {
-				res.Status = http.StatusBadRequest
-				res.Body = []byte("hello")
-				res.Err = errors.New("record not found")
+			hdlrfunc := func(ctx *APIGContext) {
+				ctx.Status = http.StatusBadRequest
+				ctx.Body = []byte("hello")
+				ctx.Err = errors.New("record not found")
 
 			}
 
@@ -127,20 +127,20 @@ func TestRouterSpec(t *testing.T) {
 		})
 
 		Convey("When the handler func does return a status < 400", func() {
-			middlefunc1 := func(req *APIGRequest, res *APIGResponse) {
-				res.Status = http.StatusOK
-				res.Body = []byte("hello")
-				res.Err = nil
+			middlefunc1 := func(ctx *APIGContext) {
+				ctx.Status = http.StatusOK
+				ctx.Body = []byte("hello")
+				ctx.Err = nil
 			}
-			middlefunc2 := func(req *APIGRequest, res *APIGResponse) {
-				res.Status = http.StatusOK
-				res.Body = []byte("hello")
-				res.Err = errors.New("bad request")
+			middlefunc2 := func(ctx *APIGContext) {
+				ctx.Status = http.StatusOK
+				ctx.Body = []byte("hello")
+				ctx.Err = errors.New("bad request")
 			}
-			hdlrfunc := func(req *APIGRequest, res *APIGResponse) {
-				res.Status = http.StatusOK
-				res.Body = []byte("hello")
-				res.Err = nil
+			hdlrfunc := func(ctx *APIGContext) {
+				ctx.Status = http.StatusOK
+				ctx.Body = []byte("hello")
+				ctx.Err = nil
 			}
 
 			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {

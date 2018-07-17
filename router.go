@@ -17,28 +17,23 @@ const (
 	delete = http.MethodDelete
 )
 
-// APIGRequest is used as the input of handler functions.
-// The Claims, Path, and QryStr will be populated by the the APIGatewayProxyRequest.
+// APIGContext is used as the input and output of handler functions.
+// The Body, Claims, Path, and QryStr will be populated by the the APIGatewayProxyRequest.
 // The Request itself is also passed through if you need further access.
-type APIGRequest struct {
-	Body    string
+// Fill the Status and Body, or Status and Error to respond.
+type APIGContext struct {
 	Claims  map[string]interface{}
 	Path    map[string]string
 	QryStr  map[string]string
 	Request *events.APIGatewayProxyRequest
-}
-
-// APIGResponse is used as the output of handler functions.
-// Populate Status and Body with your http response or populate Err with your error.
-type APIGResponse struct {
-	Status int
-	Body   []byte
-	Err    error
+	Status  int
+	Body    []byte
+	Err     error
 }
 
 // APIGHandler is the interface a handler function must implement to be used
 // with Get, Post, Put, Patch, and Delete.
-type APIGHandler func(req *APIGRequest, res *APIGResponse)
+type APIGHandler func(ctx *APIGContext)
 
 // APIGRouter is the object that handlers build upon and is used in the end to respond.
 type APIGRouter struct {
@@ -124,19 +119,18 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 	handlers := handlersInterface.([]APIGHandler)
 
 	for _, handler := range handlers {
-		req := &APIGRequest{
-			Body:    r.request.Body,
+		ctx := &APIGContext{
+			Body:    []byte(r.request.Body),
 			Path:    r.request.PathParameters,
 			QryStr:  r.request.QueryStringParameters,
 			Request: r.request,
 		}
 		if r.request.RequestContext.Authorizer["claims"] != nil {
-			req.Claims = r.request.RequestContext.Authorizer["claims"].(map[string]interface{})
+			ctx.Claims = r.request.RequestContext.Authorizer["claims"].(map[string]interface{})
 		}
-		res := &APIGResponse{}
 
-		handler(req, res)
-		status, respbody, err = res.deconstruct()
+		handler(ctx)
+		status, respbody, err = ctx.respDeconstruct()
 
 		if err != nil {
 			respbody, _ := json.Marshal(map[string]string{"error": err.Error()})
@@ -164,8 +158,8 @@ func stripSlashesAndSplit(s string) []string {
 	return strings.Split(s, "/")
 }
 
-func (res *APIGResponse) deconstruct() (int, []byte, error) {
-	return res.Status, res.Body, res.Err
+func (ctx *APIGContext) respDeconstruct() (int, []byte, error) {
+	return ctx.Status, ctx.Body, ctx.Err
 }
 
 func (r *APIGRouter) addEndpoint(method string, route string, handlers []APIGHandler) {
