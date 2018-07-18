@@ -99,15 +99,23 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 		endpointTree = r.endpoints[r.request.HTTPMethod]
 		path         = strings.TrimPrefix(r.request.Path, "/"+r.svcprefix)
 		response     = events.APIGatewayProxyResponse{}
+		splitPath    = stripSlashesAndSplit(path)
 	)
 
 	for k := range r.params {
-		p := strings.TrimPrefix(k, "{")
-		p = strings.TrimSuffix(p, "}")
-		if r.request.PathParameters[p] != "" {
-			path = strings.Replace(path, r.request.PathParameters[p], k, -1)
+		pname := strings.TrimPrefix(k, "{")
+		pname = strings.TrimSuffix(pname, "}")
+		if r.request.PathParameters[pname] != "" {
+			pval := r.request.PathParameters[pname]
+			for i, v := range splitPath {
+				if v == pval {
+					splitPath[i] = k
+				}
+			}
+
 		}
 	}
+	path = "/" + strings.Join(splitPath, "/")
 
 	if handlersInterface, ok = endpointTree.Get(path); !ok {
 		respbody, _ := json.Marshal(map[string]string{"error": "no route matching path found"})

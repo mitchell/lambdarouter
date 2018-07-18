@@ -22,8 +22,8 @@ func TestRouterSpec(t *testing.T) {
 				ctx.Err = nil
 			}
 
-			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {
-				rtr.Get("/orders/filter/by_user/{id}", hdlrfunc)
+			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
+				rtr.Get("/listings/{id}/state/{event}", hdlrfunc)
 				rtr.Post("/orders", func(ctx *APIGContext) {})
 				rtr.Put("/orders", func(ctx *APIGContext) {})
 				rtr.Patch("/orders", func(ctx *APIGContext) {})
@@ -31,9 +31,10 @@ func TestRouterSpec(t *testing.T) {
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet
-					request.Path = "/shipping/orders/filter/by_user/4d50ff90-66e3-4047-bf37-0ca25837e41d"
+					request.Path = "/shipping/listings/57/state/list"
 					request.PathParameters = map[string]string{
-						"id": "4d50ff90-66e3-4047-bf37-0ca25837e41d",
+						"id":    "57",
+						"event": "list",
 					}
 					request.RequestContext.Authorizer = map[string]interface{}{
 						"claims": map[string]interface{}{
@@ -61,9 +62,9 @@ func TestRouterSpec(t *testing.T) {
 					})
 				})
 
-				Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined AGAIN", func() {
+				Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined AGAIN", func() {
 					So(func() {
-						rtr.Get("/orders/filter/by_user/{id}", hdlrfunc)
+						rtr.Get("/listings/{id}/state/{event}", hdlrfunc)
 					}, ShouldPanicWith, "endpoint already existent")
 				})
 
@@ -106,14 +107,15 @@ func TestRouterSpec(t *testing.T) {
 
 			}
 
-			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {
-				rtr.Get("/orders/filter/by_user/{id}", hdlrfunc)
+			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
+				rtr.Get("/listings/{id}/state/{event}", hdlrfunc)
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet
-					request.Path = "/shipping/orders/filter/by_user/4d50ff90-66e3-4047-bf37-0ca25837e41d"
+					request.Path = "/shipping/listings/57/state/list"
 					request.PathParameters = map[string]string{
-						"id": "4d50ff90-66e3-4047-bf37-0ca25837e41d",
+						"id":    "57",
+						"event": "list",
 					}
 
 					Convey("The router will return the expected status and body", func() {
@@ -143,14 +145,15 @@ func TestRouterSpec(t *testing.T) {
 				ctx.Err = nil
 			}
 
-			Convey("And a Get handler expecting the pattern /orders/filter/by_user/{id} is defined", func() {
-				rtr.Get("/orders/filter/by_user/{id}", middlefunc1, middlefunc2, hdlrfunc)
+			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
+				rtr.Get("/listings/{id}/state/{event}", middlefunc1, middlefunc2, hdlrfunc)
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet
-					request.Path = "/shipping/orders/filter/by_user/4d50ff90-66e3-4047-bf37-0ca25837e41d"
+					request.Path = "/shipping/listings/57/state/list"
 					request.PathParameters = map[string]string{
-						"id": "4d50ff90-66e3-4047-bf37-0ca25837e41d",
+						"id":    "57",
+						"event": "list",
 					}
 
 					Convey("The router will return the expected status and body", func() {
