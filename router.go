@@ -2,6 +2,7 @@ package lambdarouter
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -140,6 +141,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 				status = 400
 			}
 
+			log.Printf("%v error: %v", status, err.Error())
 			response.StatusCode = status
 			response.Body = string(respbody)
 			return response
