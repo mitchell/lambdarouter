@@ -41,15 +41,25 @@ type APIGRouter struct {
 	request   *events.APIGatewayProxyRequest
 	endpoints map[string]*radix.Tree
 	params    map[string]string
-	svcprefix string
+	prefix    string
+	headers   map[string]string
+}
+
+// APIGRouterConfig is used as the input to NewAPIGRouter, request is your incoming
+// apig request and prefix will be stripped of all incoming request paths. Headers
+// will be sent with all responses.
+type APIGRouterConfig struct {
+	Request *events.APIGatewayProxyRequest
+	Prefix  string
+	Headers map[string]string
 }
 
 // NOTE: Begin router methods.
 
-// NewAPIGRouter creates a new router using the request and a prefix to strip from your incoming requests.
-func NewAPIGRouter(r *events.APIGatewayProxyRequest, svcprefix string) *APIGRouter {
+// NewAPIGRouter creates a new router using the given router config.
+func NewAPIGRouter(cfg *APIGRouterConfig) *APIGRouter {
 	return &APIGRouter{
-		request: r,
+		request: cfg.Request,
 		endpoints: map[string]*radix.Tree{
 			post:   radix.New(),
 			get:    radix.New(),
@@ -57,8 +67,9 @@ func NewAPIGRouter(r *events.APIGatewayProxyRequest, svcprefix string) *APIGRout
 			patch:  radix.New(),
 			delete: radix.New(),
 		},
-		params:    map[string]string{},
-		svcprefix: svcprefix,
+		params:  map[string]string{},
+		prefix:  cfg.Prefix,
+		headers: cfg.Headers,
 	}
 }
 
@@ -97,7 +108,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 		err               error
 
 		endpointTree = r.endpoints[r.request.HTTPMethod]
-		path         = strings.TrimPrefix(r.request.Path, "/"+r.svcprefix)
+		path         = strings.TrimPrefix(r.request.Path, r.prefix)
 		response     = events.APIGatewayProxyResponse{}
 		splitPath    = stripSlashesAndSplit(path)
 	)
@@ -158,6 +169,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 
 	response.StatusCode = status
 	response.Body = string(respbody)
+	response.Headers = r.headers
 	return response
 }
 

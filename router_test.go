@@ -13,7 +13,14 @@ func TestRouterSpec(t *testing.T) {
 
 	Convey("Given an instantiated router", t, func() {
 		request := events.APIGatewayProxyRequest{}
-		rtr := NewAPIGRouter(&request, "shipping")
+		rtr := NewAPIGRouter(&APIGRouterConfig{
+			Request: &request,
+			Prefix:  "/shipping",
+			Headers: map[string]string{
+				"Access-Control-Allow-Origin":      "*",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		})
 
 		Convey("When the handler func does NOT return an error", func() {
 			hdlrfunc := func(ctx *APIGContext) {
@@ -42,11 +49,15 @@ func TestRouterSpec(t *testing.T) {
 						},
 					}
 
-					Convey("The router will return the expected status and body", func() {
+					Convey("The router will return the expected status, body, and headers", func() {
 						response := rtr.Respond()
 
 						So(response.StatusCode, ShouldEqual, http.StatusOK)
 						So(response.Body, ShouldEqual, "hello")
+						So(response.Headers, ShouldResemble, map[string]string{
+							"Access-Control-Allow-Origin":      "*",
+							"Access-Control-Allow-Credentials": "true",
+						})
 					})
 				})
 
