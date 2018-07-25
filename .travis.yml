@@ -1,15 +1,21 @@
 language: go
+
 go:
-- 1.x
+  - 1.x
+
+before_install:
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+
 install:
-- curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-- dep ensure
-- go get golang.org/x/tools/cmd/cover
-- go get github.com/mattn/goveralls
+  - chmod +x ./cc-test-reporter
+  - dep ensure
+
+before_script:
+  - ./cc-test-reporter before-build
+
 script:
-- go test -v -covermode=count -coverprofile=coverage.out
-- $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken
-  $COVERALLS_TOKEN
-env:
-  global:
-    secure: ZQwEmXhn/whrpwJAeSBi2FduujLN/fmoyHzExOaeIK19jf0zd7HDGU/aIaBLzxCmPnBtvayeHwPqtJncqkpKYD1VKiVd2uEIj/2y2GwNTQrea8rDMKNPv38rBoFwBJv7xAygki79JrjXZ9s0EdoSZC8U4osYJksMpEJpbHTnOXxR5Ci0nAjEOpNfUmetLTK6Er2Vy+XKMMZdnwbrVbp9WNluVLC4ISiuV3SfpEmZjtktIgqoHbrEKyejzXWE8G6Ax6QptHagB3ZgltDAu2pV4w55JoI3O1dGaHtIerVjlM85BWHpQZXA/nON9KglPlDRx0wNIhWj30WdsjKUUUmjldhCwXCpMueFC3ttvPQmKAT6HjnJUcYA5Q/hVMp0NV/AFSdpKz9/jJ9nZCO73OZZVENZOo6kYq7qyz3gNwSjGuuov+hjq8tlzYmGlblvZMMT2Nw0aIXMLNEcAvaK3vl6PsBTc9JCj3xtxSVULhOZoN8vceltC1+0upi4KwoMzBfZBAMtW86LUpl2iYokVj6jzGwKCGNAI9H5c+3G/ItAwTM+E2uyCEzXGFUl8dB2Iwz2qU98XWX2aO2KLB2EexFxXuWXwJQL/kxdzRx+VfHPG00I+mDkJNOkA5Vy43hAWULnDM/Ov8c/Rx+1j5KQGvXxxKvsdy7q6dV2GOYr4/oq+3Y=
+  - go test -v -coverprofile=c.out ./...
+
+after_script:
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
