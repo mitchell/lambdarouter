@@ -74,6 +74,7 @@ func NewAPIGRouter(cfg *APIGRouterConfig) *APIGRouter {
 		params:  map[string]string{},
 		prefix:  cfg.Prefix,
 		headers: cfg.Headers,
+		context: cfg.Context,
 	}
 }
 
