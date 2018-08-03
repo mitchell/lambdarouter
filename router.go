@@ -1,6 +1,7 @@
 package lambdarouter
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -24,6 +25,7 @@ const (
 // Fill the Status and Body, or Status and Error to respond.
 type APIGContext struct {
 	Claims  map[string]interface{}
+	Context context.Context
 	Path    map[string]string
 	QryStr  map[string]string
 	Request *events.APIGatewayProxyRequest
@@ -43,12 +45,14 @@ type APIGRouter struct {
 	params    map[string]string
 	prefix    string
 	headers   map[string]string
+	context   context.Context
 }
 
 // APIGRouterConfig is used as the input to NewAPIGRouter, request is your incoming
 // apig request and prefix will be stripped of all incoming request paths. Headers
 // will be sent with all responses.
 type APIGRouterConfig struct {
+	Context context.Context
 	Request *events.APIGatewayProxyRequest
 	Prefix  string
 	Headers map[string]string
@@ -144,6 +148,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 			Path:    r.request.PathParameters,
 			QryStr:  r.request.QueryStringParameters,
 			Request: r.request,
+			Context: r.context,
 		}
 		if r.request.RequestContext.Authorizer["claims"] != nil {
 			ctx.Claims = r.request.RequestContext.Authorizer["claims"].(map[string]interface{})
