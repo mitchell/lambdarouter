@@ -138,6 +138,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 
 		response.StatusCode = http.StatusNotFound
 		response.Body = string(respbody)
+		response.Headers = r.headers
 		return response
 	}
 
@@ -162,13 +163,14 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 			respbody, _ := json.Marshal(map[string]string{"error": err.Error()})
 			if strings.Contains(err.Error(), "record not found") {
 				status = 204
-			} else if status < 400 {
+			} else if status != 204 && status < 400 {
 				status = 400
 			}
 
 			log.Printf("%v error: %v", status, err.Error())
 			response.StatusCode = status
 			response.Body = string(respbody)
+			response.Headers = r.headers
 			return response
 		}
 	}

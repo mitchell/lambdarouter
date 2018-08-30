@@ -70,6 +70,10 @@ func TestRouterSpec(t *testing.T) {
 
 						So(response.StatusCode, ShouldEqual, http.StatusNotFound)
 						So(response.Body, ShouldEqual, "{\"error\":\"no route matching path found\"}")
+						So(response.Headers, ShouldResemble, map[string]string{
+							"Access-Control-Allow-Origin":      "*",
+							"Access-Control-Allow-Credentials": "true",
+						})
 					})
 				})
 
@@ -112,7 +116,7 @@ func TestRouterSpec(t *testing.T) {
 
 		Convey("When the handler func does return a record not found", func() {
 			hdlrfunc := func(ctx *APIGContext) {
-				ctx.Status = http.StatusBadRequest
+				ctx.Status = http.StatusNoContent
 				ctx.Body = []byte("hello")
 				ctx.Err = errors.New("record not found")
 
