@@ -42,7 +42,7 @@ type APIGHandler func(ctx *APIGContext)
 type APIGRouter struct {
 	request   *events.APIGatewayProxyRequest
 	endpoints map[string]*radix.Tree
-	params    map[string]string
+	params    map[string]interface{}
 	prefix    string
 	headers   map[string]string
 	context   context.Context
@@ -71,7 +71,7 @@ func NewAPIGRouter(cfg *APIGRouterConfig) *APIGRouter {
 			patch:  radix.New(),
 			delete: radix.New(),
 		},
-		params:  map[string]string{},
+		params:  map[string]interface{}{},
 		prefix:  cfg.Prefix,
 		headers: cfg.Headers,
 		context: cfg.Context,
@@ -118,23 +118,21 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 		splitPath    = stripSlashesAndSplit(path)
 	)
 
-	for k := range r.params {
-		pname := strings.TrimPrefix(k, "{")
-		pname = strings.TrimSuffix(pname, "}")
-		if r.request.PathParameters[pname] != "" {
-			pval := r.request.PathParameters[pname]
+	for p := range r.params {
+		if r.request.PathParameters[p] != "" {
+			pval := r.request.PathParameters[p]
 			for i, v := range splitPath {
 				if v == pval {
-					splitPath[i] = k
+					splitPath[i] = "{" + p + "}"
+					break
 				}
 			}
-
 		}
 	}
 	path = "/" + strings.Join(splitPath, "/")
 
 	if handlersInterface, ok = endpointTree.Get(path); !ok {
-		respbody, _ := json.Marshal(map[string]string{"error": "no route matching path found"})
+		respbody, _ = json.Marshal(map[string]string{"error": "no route matching path found"})
 
 		response.StatusCode = http.StatusNotFound
 		response.Body = string(respbody)
@@ -160,7 +158,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 		status, respbody, err = ctx.respDeconstruct()
 
 		if err != nil {
-			respbody, _ := json.Marshal(map[string]string{"error": err.Error()})
+			respbody, _ = json.Marshal(map[string]string{"error": err.Error()})
 			if strings.Contains(err.Error(), "record not found") {
 				status = 204
 			} else if status != 204 && status < 400 {
@@ -200,7 +198,9 @@ func (r *APIGRouter) addEndpoint(method string, route string, handlers []APIGHan
 	rtearr := stripSlashesAndSplit(route)
 	for _, v := range rtearr {
 		if strings.HasPrefix(v, "{") {
-			r.params[v] = "" // adding params as keys with {brackets}
+			v = strings.TrimPrefix(v, "{")
+			v = strings.TrimSuffix(v, "}")
+			r.params[v] = nil // adding params as *unique* keys
 		}
 	}
 
