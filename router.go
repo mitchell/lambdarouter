@@ -114,6 +114,7 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 
 		endpointTree = r.endpoints[r.request.HTTPMethod]
 		path         = strings.TrimPrefix(r.request.Path, r.prefix)
+		inPath       = path
 		response     = events.APIGatewayProxyResponse{}
 		splitPath    = stripSlashesAndSplit(path)
 	)
@@ -165,7 +166,8 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 				status = 400
 			}
 
-			log.Printf("%v error: %v", status, err.Error())
+			log.Printf("%v %v %v error: %v \n", r.request.HTTPMethod, inPath, status, err.Error())
+			log.Println("error causing body: " + r.request.Body)
 			response.StatusCode = status
 			response.Body = string(respbody)
 			response.Headers = r.headers
