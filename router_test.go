@@ -1,8 +1,10 @@
 package lambdarouter
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -11,14 +13,30 @@ import (
 
 func TestRouterSpec(t *testing.T) {
 
-	Convey("Given an instantiated router", t, func() {
+	Convey("Given an instantiated router with an error reporting middleware, headers, and prefix", t, func() {
 		request := events.APIGatewayProxyRequest{}
+		errorReporter := func(handler APIGHandler) APIGHandler {
+			return func(ctx *APIGContext) {
+				handler(ctx)
+				if ctx.Err != nil {
+					ctx.Body, _ = json.Marshal(map[string]string{"error": ctx.Err.Error()})
+					if strings.Contains(ctx.Err.Error(), "record not found") {
+						ctx.Status = 204
+					} else if ctx.Status != 204 && ctx.Status < 400 {
+						ctx.Status = 400
+					}
+				}
+			}
+		}
 		rtr := NewAPIGRouter(&APIGRouterConfig{
 			Request: &request,
 			Prefix:  "/shipping",
 			Headers: map[string]string{
 				"Access-Control-Allow-Origin":      "*",
 				"Access-Control-Allow-Credentials": "true",
+			},
+			Middleware: []APIGMiddleware{
+				errorReporter,
 			},
 		})
 
@@ -144,24 +162,20 @@ func TestRouterSpec(t *testing.T) {
 		})
 
 		Convey("When the handler func does return a status < 400", func() {
-			middlefunc1 := func(ctx *APIGContext) {
-				ctx.Status = http.StatusOK
-				ctx.Body = []byte("hello")
-				ctx.Err = nil
-			}
-			middlefunc2 := func(ctx *APIGContext) {
-				ctx.Status = http.StatusOK
-				ctx.Body = []byte("hello")
-				ctx.Err = errors.New("bad request")
+			middlefunc1 := func(handler APIGHandler) APIGHandler {
+				return func(ctx *APIGContext) {
+					ctx.Status = http.StatusOK
+					ctx.Err = errors.New("bad request")
+					handler(ctx)
+				}
 			}
 			hdlrfunc := func(ctx *APIGContext) {
 				ctx.Status = http.StatusOK
 				ctx.Body = []byte("hello")
-				ctx.Err = nil
 			}
 
 			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
-				rtr.Get("/listings/{id}/state/{event}", middlefunc1, middlefunc2, hdlrfunc)
+				rtr.Get("/listings/{id}/state/{event}", hdlrfunc, middlefunc1)
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet
