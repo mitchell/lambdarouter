@@ -15,16 +15,13 @@ func TestRouterSpec(t *testing.T) {
 
 	Convey("Given an instantiated router with an error reporting middleware, headers, and prefix", t, func() {
 		request := events.APIGatewayProxyRequest{}
-		errorReporter := func(handler APIGHandler) APIGHandler {
-			return func(ctx *APIGContext) {
-				handler(ctx)
-				if ctx.Err != nil {
-					ctx.Body, _ = json.Marshal(map[string]string{"error": ctx.Err.Error()})
-					if strings.Contains(ctx.Err.Error(), "record not found") {
-						ctx.Status = 204
-					} else if ctx.Status != 204 && ctx.Status < 400 {
-						ctx.Status = 400
-					}
+		errorReporter := func(ctx *APIGContext) {
+			if ctx.Err != nil {
+				ctx.Body, _ = json.Marshal(map[string]string{"error": ctx.Err.Error()})
+				if strings.Contains(ctx.Err.Error(), "record not found") {
+					ctx.Status = 204
+				} else if ctx.Status != 204 && ctx.Status < 400 {
+					ctx.Status = 400
 				}
 			}
 		}
@@ -36,7 +33,7 @@ func TestRouterSpec(t *testing.T) {
 				"Access-Control-Allow-Credentials": "true",
 			},
 			Middleware: []APIGMiddleware{
-				errorReporter,
+				ConvertHandler(errorReporter, false),
 			},
 		})
 
@@ -162,12 +159,22 @@ func TestRouterSpec(t *testing.T) {
 		})
 
 		Convey("When the handler func does return a status < 400", func() {
-			middlefunc1 := func(handler APIGHandler) APIGHandler {
+			middlefunc1 := func(ctx *APIGContext) {
+				ctx.Status = http.StatusOK
+			}
+			middlefunc2 := func(handler APIGHandler) APIGHandler {
 				return func(ctx *APIGContext) {
 					ctx.Status = http.StatusOK
 					ctx.Err = errors.New("bad request")
+					if ctx.Err != nil {
+						return
+					}
 					handler(ctx)
+
 				}
+			}
+			middlefunc3 := func(ctx *APIGContext) {
+				ctx.Err = errors.New("bad request")
 			}
 			hdlrfunc := func(ctx *APIGContext) {
 				ctx.Status = http.StatusOK
@@ -175,7 +182,13 @@ func TestRouterSpec(t *testing.T) {
 			}
 
 			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
-				rtr.Get("/listings/{id}/state/{event}", hdlrfunc, middlefunc1)
+				rtr.Get(
+					"/listings/{id}/state/{event}",
+					hdlrfunc,
+					ConvertHandler(middlefunc1, true),
+					ConvertHandler(middlefunc3, true),
+					middlefunc2,
+				)
 
 				Convey("And the request matches the pattern and the path params are filled", func() {
 					request.HTTPMethod = http.MethodGet

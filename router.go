@@ -176,11 +176,11 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 
 	functions := routeInterface.(routeFunctions)
 
-	for _, m := range functions.middleware {
-		functions.handler = m(functions.handler)
+	for i := len(functions.middleware) - 1; i >= 0; i-- {
+		functions.handler = functions.middleware[i](functions.handler)
 	}
-	for _, m := range r.middleware {
-		functions.handler = m(functions.handler)
+	for i := len(r.middleware) - 1; i >= 0; i-- {
+		functions.handler = r.middleware[i](functions.handler)
 	}
 	functions.handler(ctx)
 
@@ -188,6 +188,29 @@ func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
 	response.Body = string(ctx.Body)
 	response.Headers = r.headers
 	return response
+}
+
+// ConvertHandler converts a pre-existing APIGHandler to an APIGMiddleware type.
+// The before boolean determines whether the converted handler runs before and
+// causes a return on error, or after and does not return if the first handler fails.
+func ConvertHandler(handler APIGHandler, before bool) APIGMiddleware {
+	if before {
+		return func(next APIGHandler) APIGHandler {
+			return func(ctx *APIGContext) {
+				handler(ctx)
+				if ctx.Err != nil {
+					return
+				}
+				next(ctx)
+			}
+		}
+	}
+	return func(first APIGHandler) APIGHandler {
+		return func(ctx *APIGContext) {
+			first(ctx)
+			handler(ctx)
+		}
+	}
 }
 
 // NOTE: Begin helper functions.
