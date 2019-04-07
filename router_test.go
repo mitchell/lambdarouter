@@ -1,184 +1,101 @@
 package lambdarouter
 
 import (
-	"errors"
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestRouterSpec(t *testing.T) {
+func TestRouter(t *testing.T) {
+	a := assert.New(t)
 
-	Convey("Given an instantiated router", t, func() {
-		request := events.APIGatewayProxyRequest{}
-		rtr := NewAPIGRouter(&APIGRouterConfig{
-			Request: &request,
-			Prefix:  "/shipping",
-			Headers: map[string]string{
-				"Access-Control-Allow-Origin":      "*",
-				"Access-Control-Allow-Credentials": "true",
-			},
+	desc(t, 0, "Intialize Router and")
+	r := New("prefix")
+	handler := lambda.NewHandler(handler)
+	ctx := context.Background()
+
+	desc(t, 2, "Get|Post|Put|Patch|Delete method should")
+	{
+		desc(t, 4, "insert a new route succesfully")
+		a.NotPanics(func() {
+			r.Get("thing/{id}", handler)
+			r.Delete("thing/{id}", handler)
+			r.Put("thing", handler)
 		})
 
-		Convey("When the handler func does NOT return an error", func() {
-			hdlrfunc := func(ctx *APIGContext) {
-				ctx.Status = http.StatusOK
-				ctx.Body = []byte("hello")
-				ctx.Err = nil
-			}
-
-			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
-				rtr.Get("/listings/{id}/state/{event}", hdlrfunc)
-				rtr.Post("/orders", func(ctx *APIGContext) {})
-				rtr.Put("/orders", func(ctx *APIGContext) {})
-				rtr.Patch("/orders", func(ctx *APIGContext) {})
-				rtr.Delete("/orders/{id}", func(ctx *APIGContext) {})
-
-				Convey("And the request matches the pattern and the path params are filled", func() {
-					request.HTTPMethod = http.MethodGet
-					request.Path = "/shipping/listings/57/state/list"
-					request.PathParameters = map[string]string{
-						"id":    "57",
-						"event": "list",
-					}
-					request.RequestContext.Authorizer = map[string]interface{}{
-						"claims": map[string]interface{}{
-							"cognito:username": "mitchell",
-						},
-					}
-
-					Convey("The router will return the expected status, body, and headers", func() {
-						response := rtr.Respond()
-
-						So(response.StatusCode, ShouldEqual, http.StatusOK)
-						So(response.Body, ShouldEqual, "hello")
-						So(response.Headers, ShouldResemble, map[string]string{
-							"Access-Control-Allow-Origin":      "*",
-							"Access-Control-Allow-Credentials": "true",
-						})
-					})
-				})
-
-				Convey("And the request does NOT match the pattern", func() {
-					request.HTTPMethod = http.MethodGet
-					request.Path = "/orders/filter"
-
-					Convey("The router will return an error body and a status not found", func() {
-						response := rtr.Respond()
-
-						So(response.StatusCode, ShouldEqual, http.StatusNotFound)
-						So(response.Body, ShouldEqual, "{\"error\":\"no route matching path found\"}")
-						So(response.Headers, ShouldResemble, map[string]string{
-							"Access-Control-Allow-Origin":      "*",
-							"Access-Control-Allow-Credentials": "true",
-						})
-					})
-				})
-
-				Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined AGAIN", func() {
-					So(func() {
-						rtr.Get("/listings/{id}/state/{event}", hdlrfunc)
-					}, ShouldPanicWith, "endpoint already existent")
-				})
-
-				Convey("And a Get handler expecting the pattern /orders/filter", func() {
-					rtr.Get("/orders/filter", hdlrfunc)
-
-					Convey("And the request matches the pattern and the path params are filled", func() {
-						request.HTTPMethod = http.MethodGet
-						request.Path = "/shipping/orders/filter"
-
-						Convey("The router will return the expected status and body", func() {
-							response := rtr.Respond()
-
-							So(response.StatusCode, ShouldEqual, http.StatusOK)
-							So(response.Body, ShouldEqual, "hello")
-						})
-					})
-
-					Convey("And the request does NOT match either of the patterns", func() {
-						request.HTTPMethod = http.MethodGet
-						request.Path = "/shipping/orders/filter/by_user"
-
-						Convey("The router will return an error body and a status not found", func() {
-							response := rtr.Respond()
-
-							So(response.StatusCode, ShouldEqual, http.StatusNotFound)
-							So(response.Body, ShouldEqual, "{\"error\":\"no route matching path found\"}")
-						})
-					})
-				})
-			})
-
+		desc(t, 4, "panic when inserting the same route")
+		a.Panics(func() {
+			r.Put("thing", handler)
 		})
 
-		Convey("When the handler func does return a record not found", func() {
-			hdlrfunc := func(ctx *APIGContext) {
-				ctx.Status = http.StatusNoContent
-				ctx.Body = []byte("hello")
-				ctx.Err = errors.New("record not found")
-
-			}
-
-			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
-				rtr.Get("/listings/{id}/state/{event}", hdlrfunc)
-
-				Convey("And the request matches the pattern and the path params are filled", func() {
-					request.HTTPMethod = http.MethodGet
-					request.Path = "/shipping/listings/57/state/list"
-					request.PathParameters = map[string]string{
-						"id":    "57",
-						"event": "list",
-					}
-
-					Convey("The router will return the expected status and body", func() {
-						response := rtr.Respond()
-
-						So(response.StatusCode, ShouldEqual, http.StatusNoContent)
-						So(response.Body, ShouldEqual, "{\"error\":\"record not found\"}")
-					})
-				})
-			})
+		desc(t, 4, "panic when router is uninitalized")
+		var r2 Router
+		a.Panics(func() {
+			r2.Patch("panic", handler)
 		})
+	}
 
-		Convey("When the handler func does return a status < 400", func() {
-			middlefunc1 := func(ctx *APIGContext) {
-				ctx.Status = http.StatusOK
-				ctx.Body = []byte("hello")
-				ctx.Err = nil
-			}
-			middlefunc2 := func(ctx *APIGContext) {
-				ctx.Status = http.StatusOK
-				ctx.Body = []byte("hello")
-				ctx.Err = errors.New("bad request")
-			}
-			hdlrfunc := func(ctx *APIGContext) {
-				ctx.Status = http.StatusOK
-				ctx.Body = []byte("hello")
-				ctx.Err = nil
-			}
-
-			Convey("And a Get handler expecting the pattern /listings/{id}/state/{event} is defined", func() {
-				rtr.Get("/listings/{id}/state/{event}", middlefunc1, middlefunc2, hdlrfunc)
-
-				Convey("And the request matches the pattern and the path params are filled", func() {
-					request.HTTPMethod = http.MethodGet
-					request.Path = "/shipping/listings/57/state/list"
-					request.PathParameters = map[string]string{
-						"id":    "57",
-						"event": "list",
-					}
-
-					Convey("The router will return the expected status and body", func() {
-						response := rtr.Respond()
-
-						So(response.StatusCode, ShouldEqual, http.StatusBadRequest)
-						So(response.Body, ShouldEqual, "{\"error\":\"bad request\"}")
-					})
-				})
-			})
+	desc(t, 2, "PrefixGroup method should")
+	{
+		desc(t, 4, "insert routes with the specified prefix succesfully")
+		r.Group("/ding", func(r *Router) {
+			r.Post("dong/{door}", handler)
 		})
-	})
+	}
+
+	desc(t, 2, "Invoke method should")
+	{
+		e := events.APIGatewayProxyRequest{
+			Path:           "/prefix/ding/dong/mitchell",
+			HTTPMethod:     http.MethodPost,
+			PathParameters: map[string]string{"door": "mitchell"},
+		}
+
+		desc(t, 4, "should succesfully route and invoke a defined route")
+		ejson, _ := json.Marshal(e)
+
+		res, err := r.Invoke(ctx, ejson)
+
+		a.NoError(err)
+		a.Exactly("null", string(res))
+
+		desc(t, 4, "return the expected response when a route is not found")
+		e.Path = "thing"
+		e.PathParameters = nil
+		ejson2, _ := json.Marshal(e)
+		eres := events.APIGatewayProxyResponse{
+			StatusCode: http.StatusNotFound,
+			Body:       "not found",
+		}
+		eresjson, _ := json.Marshal(eres)
+
+		res, err = r.Invoke(ctx, ejson2)
+
+		a.NoError(err)
+		a.ElementsMatch(eresjson, res)
+
+		desc(t, 4, "return an error when the there is an issue with the incoming event")
+		_, err = r.Invoke(ctx, nil)
+
+		a.Error(err)
+	}
+
+}
+
+func handler() error {
+	return nil
+}
+
+func desc(t *testing.T, depth int, str string, args ...interface{}) {
+	for i := 0; i < depth; i++ {
+		str = " " + str
+	}
+
+	t.Log(fmt.Sprintf(str, args...))
 }

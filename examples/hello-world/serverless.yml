@@ -1,0 +1,42 @@
+service: lambdarouter-hello-world
+frameworkVersion: ">=1.28.0 <2.0.0"
+
+provider:
+  name: aws
+  runtime: go1.x
+  stage: ${opt:stage, 'dev'}
+  region: us-west-2
+#  iamRoleStatements:
+#  environment:
+
+package:
+  exclude:
+    - ./**
+  include:
+    - ./bin/**
+
+functions:
+  hello:
+    handler: bin/hello
+    events:
+      - http:
+          path: hellosrv/hello
+          method: post
+      - http:
+          path: hellosrv/hello/{name}
+          method: get
+          request:
+            parameters:
+              path:
+                name: true
+      - http:
+          path: hellosrv/hello/french
+          method: put
+      - http:
+          path: hellosrv/hello/french/{prenom}
+          method: get
+          request:
+            parameters:
+              path:
+                prenom: true
+#resources:

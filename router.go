@@ -3,207 +3,134 @@ package lambdarouter
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 
-	radix "github.com/armon/go-radix"
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	iradix "github.com/hashicorp/go-immutable-radix"
 )
 
-const (
-	post   = http.MethodPost
-	get    = http.MethodGet
-	put    = http.MethodPut
-	patch  = http.MethodPatch
-	delete = http.MethodDelete
-)
-
-// APIGContext is used as the input and output of handler functions.
-// The Body, Claims, Path, and QryStr will be populated by the the APIGatewayProxyRequest.
-// The Request itself is also passed through if you need further access.
-// Fill the Status and Body, or Status and Error to respond.
-type APIGContext struct {
-	Claims  map[string]interface{}
-	Context context.Context
-	Path    map[string]string
-	QryStr  map[string]string
-	Request *events.APIGatewayProxyRequest
-	Status  int
-	Body    []byte
-	Err     error
+// Router holds the defined routes for use upon invocation.
+type Router struct {
+	events *iradix.Tree
+	prefix string
 }
 
-// APIGHandler is the interface a handler function must implement to be used
-// with Get, Post, Put, Patch, and Delete.
-type APIGHandler func(ctx *APIGContext)
+// New initializes an empty router.
+func New(prefix string) Router {
+	if prefix[0] != '/' {
+		prefix = "/" + prefix
+	}
+	if prefix[len(prefix)-1] != '/' {
+		prefix += "/"
+	}
 
-// APIGRouter is the object that handlers build upon and is used in the end to respond.
-type APIGRouter struct {
-	request   *events.APIGatewayProxyRequest
-	endpoints map[string]*radix.Tree
-	params    map[string]interface{}
-	prefix    string
-	headers   map[string]string
-	context   context.Context
-}
-
-// APIGRouterConfig is used as the input to NewAPIGRouter, request is your incoming
-// apig request and prefix will be stripped of all incoming request paths. Headers
-// will be sent with all responses.
-type APIGRouterConfig struct {
-	Context context.Context
-	Request *events.APIGatewayProxyRequest
-	Prefix  string
-	Headers map[string]string
-}
-
-// NOTE: Begin router methods.
-
-// NewAPIGRouter creates a new router using the given router config.
-func NewAPIGRouter(cfg *APIGRouterConfig) *APIGRouter {
-	return &APIGRouter{
-		request: cfg.Request,
-		endpoints: map[string]*radix.Tree{
-			post:   radix.New(),
-			get:    radix.New(),
-			put:    radix.New(),
-			patch:  radix.New(),
-			delete: radix.New(),
-		},
-		params:  map[string]interface{}{},
-		prefix:  cfg.Prefix,
-		headers: cfg.Headers,
-		context: cfg.Context,
+	return Router{
+		events: iradix.New(),
+		prefix: prefix,
 	}
 }
 
-// Get creates a new get endpoint.
-func (r *APIGRouter) Get(route string, handlers ...APIGHandler) {
-	r.addEndpoint(get, route, handlers)
+// Get adds a new GET method route to the router. The path parameter is the route path you wish to
+// define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
+// route.
+func (r *Router) Get(path string, handler lambda.Handler) {
+	path = r.prefix + path
+	r.addEvent(http.MethodGet+path, event{h: handler})
 }
 
-// Post creates a new post endpoint.
-func (r *APIGRouter) Post(route string, handlers ...APIGHandler) {
-	r.addEndpoint(post, route, handlers)
+// Post adds a new POST method route to the router. The path parameter is the route path you wish to
+// define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
+// route.
+func (r *Router) Post(path string, handler lambda.Handler) {
+	path = r.prefix + path
+	r.addEvent(http.MethodPost+path, event{h: handler})
 }
 
-// Put creates a new put endpoint.
-func (r *APIGRouter) Put(route string, handlers ...APIGHandler) {
-	r.addEndpoint(put, route, handlers)
+// Put adds a new PUT method route to the router. The path parameter is the route path you wish to
+// define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
+// route.
+func (r *Router) Put(path string, handler lambda.Handler) {
+	path = r.prefix + path
+	r.addEvent(http.MethodPut+path, event{h: handler})
 }
 
-// Patch creates a new patch endpoint
-func (r *APIGRouter) Patch(route string, handlers ...APIGHandler) {
-	r.addEndpoint(patch, route, handlers)
+// Patch adds a new PATCH method route to the router. The path parameter is the route path you wish
+// to define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
+// route.
+func (r *Router) Patch(path string, handler lambda.Handler) {
+	path = r.prefix + path
+	r.addEvent(http.MethodPatch+path, event{h: handler})
 }
 
-// Delete creates a new delete endpoint.
-func (r *APIGRouter) Delete(route string, handlers ...APIGHandler) {
-	r.addEndpoint(delete, route, handlers)
+// Delete adds a new DELETE method route to the router. The path parameter is the route path you
+// wish to define. The handler parameter is a lambda.Handler to invoke if an incoming path matches
+// the route.
+func (r *Router) Delete(path string, handler lambda.Handler) {
+	path = r.prefix + path
+	r.addEvent(http.MethodDelete+path, event{h: handler})
 }
 
-// Respond returns an APIGatewayProxyResponse to respond to the lambda request.
-func (r *APIGRouter) Respond() events.APIGatewayProxyResponse {
-	var (
-		handlersInterface interface{}
-		ok                bool
-		status            int
-		respbody          []byte
-		err               error
+// Invoke implements the lambda.Handler interface for the Router type.
+func (r Router) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
+	var req events.APIGatewayProxyRequest
 
-		endpointTree = r.endpoints[r.request.HTTPMethod]
-		path         = strings.TrimPrefix(r.request.Path, r.prefix)
-		inPath       = path
-		response     = events.APIGatewayProxyResponse{}
-		splitPath    = stripSlashesAndSplit(path)
-	)
-
-	for p := range r.params {
-		if r.request.PathParameters[p] != "" {
-			pval := r.request.PathParameters[p]
-			for i, v := range splitPath {
-				if v == pval {
-					splitPath[i] = "{" + p + "}"
-					break
-				}
-			}
-		}
-	}
-	path = "/" + strings.Join(splitPath, "/")
-
-	if handlersInterface, ok = endpointTree.Get(path); !ok {
-		respbody, _ = json.Marshal(map[string]string{"error": "no route matching path found"})
-
-		response.StatusCode = http.StatusNotFound
-		response.Body = string(respbody)
-		response.Headers = r.headers
-		return response
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, err
 	}
 
-	handlers := handlersInterface.([]APIGHandler)
+	path := req.Path
 
-	for _, handler := range handlers {
-		ctx := &APIGContext{
-			Body:    []byte(r.request.Body),
-			Path:    r.request.PathParameters,
-			QryStr:  r.request.QueryStringParameters,
-			Request: r.request,
-			Context: r.context,
-		}
-		if r.request.RequestContext.Authorizer["claims"] != nil {
-			ctx.Claims = r.request.RequestContext.Authorizer["claims"].(map[string]interface{})
-		}
-
-		handler(ctx)
-		status, respbody, err = ctx.respDeconstruct()
-
-		if err != nil {
-			respbody, _ = json.Marshal(map[string]string{"error": err.Error()})
-			if strings.Contains(err.Error(), "record not found") {
-				status = 204
-			} else if status != 204 && status < 400 {
-				status = 400
-			}
-
-			log.Printf("%v %v %v error: %v \n", r.request.HTTPMethod, inPath, status, err.Error())
-			log.Println("error causing body: " + r.request.Body)
-			response.StatusCode = status
-			response.Body = string(respbody)
-			response.Headers = r.headers
-			return response
-		}
+	for param, value := range req.PathParameters {
+		path = strings.Replace(path, value, "{"+param+"}", -1)
 	}
 
-	response.StatusCode = status
-	response.Body = string(respbody)
-	response.Headers = r.headers
-	return response
-}
+	i, found := r.events.Get([]byte(req.HTTPMethod + path))
 
-// NOTE: Begin helper functions.
-func stripSlashesAndSplit(s string) []string {
-	s = strings.TrimPrefix(s, "/")
-	s = strings.TrimSuffix(s, "/")
-	return strings.Split(s, "/")
-}
-
-func (ctx *APIGContext) respDeconstruct() (int, []byte, error) {
-	return ctx.Status, ctx.Body, ctx.Err
-}
-
-func (r *APIGRouter) addEndpoint(method string, route string, handlers []APIGHandler) {
-	if _, overwrite := r.endpoints[method].Insert(route, handlers); overwrite {
-		panic("endpoint already existent")
+	if !found {
+		return json.Marshal(events.APIGatewayProxyResponse{
+			StatusCode: http.StatusNotFound,
+			Body:       "not found",
+		})
 	}
 
-	rtearr := stripSlashesAndSplit(route)
-	for _, v := range rtearr {
-		if strings.HasPrefix(v, "{") {
-			v = strings.TrimPrefix(v, "{")
-			v = strings.TrimSuffix(v, "}")
-			r.params[v] = nil // adding params as *unique* keys
-		}
+	e := i.(event)
+	return e.h.Invoke(ctx, payload)
+}
+
+// Group allows you to define many routes with the same prefix. The prefix parameter will apply the
+// prefix to all routes defined in the function. The fn parmater is a function in which the grouped
+// routes should be defined.
+func (r *Router) Group(prefix string, fn func(r *Router)) {
+	if prefix[0] == '/' {
+		prefix = prefix[1:]
+	}
+	if prefix[len(prefix)-1] != '/' {
+		prefix += "/"
 	}
 
+	original := r.prefix
+	r.prefix += prefix
+	fn(r)
+	r.prefix = original
+}
+
+type event struct {
+	h lambda.Handler
+}
+
+func (r *Router) addEvent(key string, e event) {
+	if r.events == nil {
+		panic("router not initialized")
+	}
+
+	routes, _, overwrite := r.events.Insert([]byte(key), e)
+
+	if overwrite {
+		panic(fmt.Sprintf("event '%s' already exists", key))
+	}
+
+	r.events = routes
 }

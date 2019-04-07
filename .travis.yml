@@ -4,12 +4,12 @@ go:
   - 1.x
 
 before_install:
-  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
   - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 
 install:
+  - dep ensure -v
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
   - chmod +x ./cc-test-reporter
-  - dep ensure
 
 before_script:
   - ./cc-test-reporter before-build
