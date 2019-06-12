@@ -18,13 +18,15 @@ type Router struct {
 	prefix string
 }
 
-// New initializes an empty router.
+// New initializes an empty router. The prefix parameter may be of any length.
 func New(prefix string) Router {
-	if prefix[0] != '/' {
-		prefix = "/" + prefix
-	}
-	if prefix[len(prefix)-1] != '/' {
-		prefix += "/"
+	if len(prefix) > 0 {
+		if prefix[0] != '/' {
+			prefix = "/" + prefix
+		}
+		if prefix[len(prefix)-1] != '/' {
+			prefix += "/"
+		}
 	}
 
 	return Router{
@@ -37,40 +39,35 @@ func New(prefix string) Router {
 // define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
 // route.
 func (r *Router) Get(path string, handler lambda.Handler) {
-	path = r.prefix + path
-	r.addEvent(http.MethodGet+path, event{h: handler})
+	r.addEvent(prepPath(http.MethodGet, r.prefix, path), event{h: handler})
 }
 
 // Post adds a new POST method route to the router. The path parameter is the route path you wish to
 // define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
 // route.
 func (r *Router) Post(path string, handler lambda.Handler) {
-	path = r.prefix + path
-	r.addEvent(http.MethodPost+path, event{h: handler})
+	r.addEvent(prepPath(http.MethodPost, r.prefix, path), event{h: handler})
 }
 
 // Put adds a new PUT method route to the router. The path parameter is the route path you wish to
 // define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
 // route.
 func (r *Router) Put(path string, handler lambda.Handler) {
-	path = r.prefix + path
-	r.addEvent(http.MethodPut+path, event{h: handler})
+	r.addEvent(prepPath(http.MethodPut, r.prefix, path), event{h: handler})
 }
 
 // Patch adds a new PATCH method route to the router. The path parameter is the route path you wish
 // to define. The handler parameter is a lambda.Handler to invoke if an incoming path matches the
 // route.
 func (r *Router) Patch(path string, handler lambda.Handler) {
-	path = r.prefix + path
-	r.addEvent(http.MethodPatch+path, event{h: handler})
+	r.addEvent(prepPath(http.MethodPatch, r.prefix, path), event{h: handler})
 }
 
 // Delete adds a new DELETE method route to the router. The path parameter is the route path you
 // wish to define. The handler parameter is a lambda.Handler to invoke if an incoming path matches
 // the route.
 func (r *Router) Delete(path string, handler lambda.Handler) {
-	path = r.prefix + path
-	r.addEvent(http.MethodDelete+path, event{h: handler})
+	r.addEvent(prepPath(http.MethodDelete, r.prefix, path), event{h: handler})
 }
 
 // Invoke implements the lambda.Handler interface for the Router type.
@@ -100,10 +97,12 @@ func (r Router) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
 	return e.h.Invoke(ctx, payload)
 }
 
-// Group allows you to define many routes with the same prefix. The prefix parameter will apply the
-// prefix to all routes defined in the function. The fn parmater is a function in which the grouped
+// Group allows you to define many routes with the same prefix. The prefix parameter will be applied
+// to all routes defined in the function. The fn parameter is a function in which the grouped
 // routes should be defined.
 func (r *Router) Group(prefix string, fn func(r *Router)) {
+	validatePathPart(prefix)
+
 	if prefix[0] == '/' {
 		prefix = prefix[1:]
 	}
@@ -133,4 +132,23 @@ func (r *Router) addEvent(key string, e event) {
 	}
 
 	r.events = routes
+}
+
+func prepPath(method, prefix, path string) string {
+	validatePathPart(path)
+
+	if path[0] == '/' {
+		path = path[1:]
+	}
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	return method + prefix + path
+}
+
+func validatePathPart(part string) {
+	if len(part) == 0 {
+		panic("path was empty")
+	}
 }

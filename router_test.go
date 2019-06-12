@@ -25,7 +25,7 @@ func TestRouter(t *testing.T) {
 		desc(t, 4, "insert a new route succesfully")
 		a.NotPanics(func() {
 			r.Get("thing/{id}", handler)
-			r.Delete("thing/{id}", handler)
+			r.Delete("/thing/{id}/", handler)
 			r.Put("thing", handler)
 		})
 
@@ -38,6 +38,11 @@ func TestRouter(t *testing.T) {
 		var r2 Router
 		a.Panics(func() {
 			r2.Patch("panic", handler)
+		})
+
+		desc(t, 4, "panic when when given an empty path")
+		a.Panics(func() {
+			r.Post("", handler)
 		})
 	}
 
