@@ -81,7 +81,9 @@ func (r Router) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
 	path := req.Path
 
 	for param, value := range req.PathParameters {
-		path = strings.Replace(path, value, "{"+param+"}", -1)
+		oldValue := fmt.Sprintf("/%s/", value)
+		newValue := fmt.Sprintf("/{%s}/", param)
+		path = strings.Replace(path, oldValue, newValue, -1)
 	}
 
 	i, found := r.events.Get([]byte(req.HTTPMethod + path))
