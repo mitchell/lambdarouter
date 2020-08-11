@@ -51,6 +51,7 @@ func TestRouter(t *testing.T) {
 		desc(t, 4, "insert routes with the specified prefix succesfully")
 		r.Group("/ding", func(r *Router) {
 			r.Post("dong/{door}", handler)
+			r.Post("{dong}/door", handler)
 		})
 	}
 
@@ -89,6 +90,20 @@ func TestRouter(t *testing.T) {
 		_, err = r.Invoke(ctx, nil)
 
 		a.Error(err)
+
+		e = events.APIGatewayProxyRequest{
+			Path:           "/prefix/ding/talal/door",
+			HTTPMethod:     http.MethodPost,
+			PathParameters: map[string]string{"dong": "talal"},
+		}
+
+		desc(t, 4, "should succesfully route and invoke a defined route")
+		ejson, _ = json.Marshal(e)
+
+		res, err = r.Invoke(ctx, ejson)
+
+		a.NoError(err)
+		a.Exactly("null", string(res))
 	}
 
 }

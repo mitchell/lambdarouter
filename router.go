@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -81,9 +82,10 @@ func (r Router) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
 	path := req.Path
 
 	for param, value := range req.PathParameters {
-		oldValue := fmt.Sprintf("/%s/", value)
-		newValue := fmt.Sprintf("/{%s}/", param)
-		path = strings.Replace(path, oldValue, newValue, -1)
+		r := regexp.MustCompile(fmt.Sprintf("/(%s)(/|$)", value))
+		path = r.ReplaceAllStringFunc(path, func(m string) string {
+			return strings.Replace(m, value, fmt.Sprintf("{%s}", param), -1)
+		})
 	}
 
 	i, found := r.events.Get([]byte(req.HTTPMethod + path))
