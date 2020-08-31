@@ -1,4 +1,4 @@
-module github.com/mitchell/lambdarouter
+module github.com/whip-networks/lambdarouter
 
 require (
 	github.com/aws/aws-lambda-go v1.10.0
