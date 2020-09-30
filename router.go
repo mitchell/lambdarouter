@@ -84,7 +84,7 @@ func (r Router) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
 	for param, value := range req.PathParameters {
 		r := regexp.MustCompile(fmt.Sprintf("/(%s)(/|$)", value))
 		path = r.ReplaceAllStringFunc(path, func(m string) string {
-			return strings.Replace(m, value, fmt.Sprintf("{%s}", param), -1)
+			return strings.Replace(m, value, fmt.Sprintf("{%s}", param), 1)
 		})
 	}
 
